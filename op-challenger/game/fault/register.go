@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/trace/outputs"
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/trace/prestates"
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/trace/utils"
+	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/trace/vm"
 	faultTypes "github.com/ethereum-optimism/optimism/op-challenger/game/fault/types"
 	keccakTypes "github.com/ethereum-optimism/optimism/op-challenger/game/keccak/types"
 	"github.com/ethereum-optimism/optimism/op-challenger/game/scheduler"
@@ -215,7 +216,7 @@ func registerAsterisc(
 		if err != nil {
 			return nil, fmt.Errorf("required prestate %v not available: %w", prestateHash, err)
 		}
-		return asterisc.NewPrestateProvider(prestatePath), nil
+		return vm.NewPrestateProvider(prestatePath, asterisc.NewStateConverter()), nil
 	})
 	playerCreator := func(game types.GameMetadata, dir string) (scheduler.GamePlayer, error) {
 		contract, err := contracts.NewFaultDisputeGameContract(ctx, m, game.Proxy, caller)
@@ -308,7 +309,7 @@ func registerCannon(
 		if err != nil {
 			return nil, fmt.Errorf("required prestate %v not available: %w", prestateHash, err)
 		}
-		return cannon.NewPrestateProvider(prestatePath), nil
+		return vm.NewPrestateProvider(prestatePath, cannon.NewStateConverter()), nil
 	})
 	playerCreator := func(game types.GameMetadata, dir string) (scheduler.GamePlayer, error) {
 		contract, err := contracts.NewFaultDisputeGameContract(ctx, m, game.Proxy, caller)
