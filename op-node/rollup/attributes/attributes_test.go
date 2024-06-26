@@ -242,7 +242,7 @@ func TestAttributesHandler(t *testing.T) {
 			// The payloadA1 is going to get reorged out in favor of attrA1Alt (turns into payloadA1Alt)
 			l2.ExpectPayloadByNumber(refA1.Number, payloadA1, nil)
 			// fail consolidation, perform force reorg
-			emitter.ExpectOnce(engine.ProcessAttributesEvent{Attributes: attrA1Alt})
+			emitter.ExpectOnce(engine.BuildStartEvent{Attributes: attrA1Alt})
 			ah.OnEvent(engine.PendingSafeUpdateEvent{
 				PendingSafe: refA0,
 				Unsafe:      refA1,
@@ -328,7 +328,7 @@ func TestAttributesHandler(t *testing.T) {
 		require.True(t, attrA1Alt.IsLastInSpan, "must be last in span for attributes to become safe")
 
 		// attrA1Alt will fit right on top of A0
-		emitter.ExpectOnce(engine.ProcessAttributesEvent{Attributes: attrA1Alt})
+		emitter.ExpectOnce(engine.BuildStartEvent{Attributes: attrA1Alt})
 		ah.OnEvent(engine.PendingSafeUpdateEvent{
 			PendingSafe: refA0,
 			Unsafe:      refA0,

@@ -40,7 +40,7 @@ func NewDriver(logger log.Logger, cfg *rollup.Config, l1Source derive.L1Fetcher,
 	pipelineDeriver := derive.NewPipelineDeriver(context.Background(), pipeline, d)
 
 	ec := engine.NewEngineController(l2Source, logger, metrics.NoopMetrics, cfg, &sync.Config{SyncMode: sync.CLSync}, d)
-	engineDeriv := engine.NewEngDeriver(logger, context.Background(), cfg, ec, d)
+	engineDeriv := engine.NewEngDeriver(logger, context.Background(), cfg, ec, metrics.NoopMetrics, d)
 	syncCfg := &sync.Config{SyncMode: sync.CLSync}
 	engResetDeriv := engine.NewEngineResetDeriver(context.Background(), logger, cfg, l1Source, l2Source, syncCfg, d)
 
