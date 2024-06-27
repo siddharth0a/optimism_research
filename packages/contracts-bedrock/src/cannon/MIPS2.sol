@@ -63,6 +63,9 @@ contract MIPS2 is ISemver {
     // The offset of the start of proof calldata (_threadWitness.offset) in the step() function
     uint256 internal constant THREAD_PROOF_OFFSET = 1284;
 
+    // TODO: Fill this with a valid empty thread root
+    bytes32 internal constant EMPTY_THREAD_ROOT = 0x0;
+
     /// @param _oracle The address of the preimage oracle contract.
     constructor(IPreimageOracle _oracle) {
         ORACLE = _oracle;
@@ -168,6 +171,7 @@ contract MIPS2 is ISemver {
             }
 
             // verify thread stack proof
+            // TODO: move this to preemptThread to cover the empty stack case
             bytes32 currThreadRoot = state.traverseRight ? state.rightThreadStack : state.leftThreadStack;
             require(currThreadRoot == witnessRoot, "invalid thread stack proof");
 
@@ -177,17 +181,24 @@ contract MIPS2 is ISemver {
 
             state.step += 1;
 
+            // If we've completed traversing both stacks
+            // TODO: there's no thread witness in this case. So the above witness check would fail.
+            if (state.traverseRight && state.rightThreadStack == EMPTY_THREAD_ROOT) {
+                state.traverseRight = false;
+                state.wakeup = 0xFF_FF_FF_FF;
+                return outputState();
+            }
+
             // Skip thread if it already exited
             if (thread.exited) {
                 preemptThread(state, thread, innerThreadRoot);
                 return outputState();
             }
 
-            // TODO: If state.wakeup is set, traverse once to find a waiting thread.
-            // And if we've woken up a thread, then we're done with step
+           	// Search for the first thread blocked by the wakeup call, if wakeup is set
+	        // Don't allow regular execution until we resolved if we have woken up any thread.
             if (state.wakeup != 0xFF_FF_FF_FF && state.wakeup != thread.futexAddr) {
                 preemptThread(state, thread, innerThreadRoot);
-                // TODO: need to figure out when to stop traversing
                 return outputState();
             }
 
@@ -196,14 +207,17 @@ contract MIPS2 is ISemver {
                 // check timeout first
                 if (thread.futexTimeoutStep > state.step) {
                     // timeout! Allow execution
-                    // TODO
+                    return onWaitComplete(state, thread);
                 } else {
                     uint32 mem = MIPSMemory.readMem(state.memRoot, thread.futexAddr & 0xFFffFFfc, MIPSMemory.memoryProofOffset(MEM_PROOF_OFFSET, 1));
                     if (thread.futexVal == mem) {
+                        // still got expected value, continue sleeping, try next thread.
                         preemptThread(state, thread, innerThreadRoot);
                         return outputState();
                     } else {
-                        // TODO
+                        // wake thread up, the value at its address changed!
+				        // Userspace can turn thread back to sleep if it was too sporadic.
+                        return onWaitComplete(state, thread);
                     }
                 }
             }
@@ -329,9 +343,10 @@ contract MIPS2 is ISemver {
                         }
                     }
                 } else if (a1 == sys.FUTEX_WAKE_PRIVATE) {
-                    // Trigger thread traversal until we find one waiting on the wakeup address
+                    // Trigger thread traversal starting from the left stack until we find one waiting on the wakeup address
                     state.wakeup = a0;
                     preemptThread(state, thread, _innerThreadRoot);
+                    state.traverseRight = false;
                     // Don't indicate to the program that we've woken up a waiting thread, as there are no guarantees.
                     // The woken up thread should indicate this in userspace.
                     v0 = 0;
@@ -416,15 +431,37 @@ contract MIPS2 is ISemver {
         }
     }
 
-    /// @notice Preempts the current thread and updates the VM state.
+    function onWaitComplete(State memory _state, ThreadContext memory _thread) internal returns (bytes32 out_) {
+        // Clear the futex state
+        _thread.futexAddr = 0xFF_FF_FF_FF;
+        _thread.futexVal = 0;
+        _thread.futexTimeoutStep = 0;
+
+        // Complete the FUTEX_WAIT syscall
+        _thread.registers[2] = 0; // 0 because caaller is woken up
+        _thread.registers[7] = 0; // 0 because no error
+	    _thread.pc = _thread.nextPC;
+	    _thread.nextPC = _thread.nextPC + 4;
+
+        _state.wakeup = 0xFF_FF_FF_FF;
+        out_ = outputState();
+    }
+
+    /// @notice Preempts the current thread for another and updates the VM state.
     function preemptThread(State memory _state, ThreadContext memory _thread, bytes32 _innerThreadRoot) internal pure {
         // pop thread from the current stack and push to the other stack
         if (_state.traverseRight) {
+            require(_state.rightThreadStack != EMPTY_THREAD_ROOT, "empty right thread stack");
             _state.rightThreadStack = _innerThreadRoot;
             _state.leftThreadStack = computeThreadRoot(_state.leftThreadStack, _thread);
        }  else {
+            require(_state.leftThreadStack != EMPTY_THREAD_ROOT, "empty left thread stack");
            _state.leftThreadStack = _innerThreadRoot;
             _state.rightThreadStack = computeThreadRoot(_state.rightThreadStack, _thread);
+        }
+        bytes32 current = _state.traverseRight ? _state.rightThreadStack : _state.leftThreadStack;
+        if (current == EMPTY_THREAD_ROOT) {
+            _state.traverseRight = !_state.traverseRight;
         }
     }
 
