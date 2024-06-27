@@ -14,6 +14,13 @@ library MIPSSyscalls {
     uint32 internal constant SYS_READ = 4003;
     uint32 internal constant SYS_WRITE = 4004;
     uint32 internal constant SYS_FCNTL = 4055;
+    uint32 internal constant SYS_EXIT = 4001;
+    uint32 internal constant SYS_SCHED_YIELD = 4162;
+    uint32 internal constant SYS_GETTID = 4122;
+    uint32 internal constant SYS_GET_AFFINITY = 4240;
+    uint32 internal constant SYS_CLOCK_GETTIME = 4263;
+    uint32 internal constant SYS_FUTEX = 4238;
+
 
     uint32 internal constant FD_STDIN = 0;
     uint32 internal constant FD_STDOUT = 1;
