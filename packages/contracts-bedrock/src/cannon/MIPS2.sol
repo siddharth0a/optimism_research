@@ -83,8 +83,6 @@ contract MIPS2 is ISemver {
         unchecked {
             State memory state;
             ThreadContext memory thread;
-            bytes32 innerThreadRoot;
-            bytes32 witnessRoot;
 
             assembly {
                 if iszero(eq(state, 0x80)) {
@@ -134,46 +132,7 @@ contract MIPS2 is ISemver {
                 c, m := putField(c, m, 1) // traverseRight
                 c, m := putField(c, m, 32) // leftThreadStack
                 c, m := putField(c, m, 32) // rightThreadStack
-
-                // Unpack thread from calldata into memory
-                c := _threadWitness.offset
-                m := 0x120 // thread mem offset
-                c, m := putField(c, m, 4) // threadID
-                c, m := putField(c, m, 1) // exitCode
-                c, m := putField(c, m, 1) // exited
-                c, m := putField(c, m, 4) // futexAddr
-                c, m := putField(c, m, 4) // futexVal
-                c, m := putField(c, m, 8) // futexTimeoutStep
-                c, m := putField(c, m, 4) // pc
-                c, m := putField(c, m, 4) // nextPC
-                c, m := putField(c, m, 4) // lo
-                c, m := putField(c, m, 4) // hi
-                // Unpack register calldata into memory
-                mstore(m, add(m, 32)) // offset to registers
-                m := add(m, 32)
-                for { let i := 0 } lt(i, 32) { i := add(i, 1) } { c, m := putField(c, m, 4) }
-
-                // Unpack the inner thread root (i.e. w_{i-1}) in witness
-                // It's right after the thread context, so leave c untouched
-                innerThreadRoot := calldataload(c)
-
-                // compute hash onion
-                let memptr := mload(0x40)
-                calldatacopy(memptr, THREAD_PROOF_OFFSET, 166) // threadContext.length
-                mstore(0x40, add(memptr, 166))
-                let threadRoot := keccak256(memptr, 166)
-
-                memptr := mload(0x40)
-                mstore(memptr, innerThreadRoot)
-                calldatacopy(add(memptr, 32), add(THREAD_PROOF_OFFSET, 166), 32)
-                mstore(0x40, add(memptr, 64))
-                witnessRoot := keccak256(memptr, 64)
             }
-
-            // verify thread stack proof
-            // TODO: move this to preemptThread to cover the empty stack case
-            bytes32 currThreadRoot = state.traverseRight ? state.rightThreadStack : state.leftThreadStack;
-            require(currThreadRoot == witnessRoot, "invalid thread stack proof");
 
             if (state.exited) {
                 return outputState();
@@ -189,16 +148,19 @@ contract MIPS2 is ISemver {
                 return outputState();
             }
 
+            setThreadContextFromCalldata(thread);
+            validateThreadWitness(state, thread);
+
             // Skip thread if it already exited
             if (thread.exited) {
-                preemptThread(state, thread, innerThreadRoot);
+                preemptThread(state, thread);
                 return outputState();
             }
 
            	// Search for the first thread blocked by the wakeup call, if wakeup is set
 	        // Don't allow regular execution until we resolved if we have woken up any thread.
             if (state.wakeup != 0xFF_FF_FF_FF && state.wakeup != thread.futexAddr) {
-                preemptThread(state, thread, innerThreadRoot);
+                preemptThread(state, thread);
                 return outputState();
             }
 
@@ -212,7 +174,7 @@ contract MIPS2 is ISemver {
                     uint32 mem = MIPSMemory.readMem(state.memRoot, thread.futexAddr & 0xFFffFFfc, MIPSMemory.memoryProofOffset(MEM_PROOF_OFFSET, 1));
                     if (thread.futexVal == mem) {
                         // still got expected value, continue sleeping, try next thread.
-                        preemptThread(state, thread, innerThreadRoot);
+                        preemptThread(state, thread);
                         return outputState();
                     } else {
                         // wake thread up, the value at its address changed!
@@ -230,7 +192,7 @@ contract MIPS2 is ISemver {
             // Handle syscall separately
             // syscall (can read and write)
             if (opcode == 0 && fun == 0xC) {
-                return handleSyscall(_localContext, innerThreadRoot);
+                return handleSyscall(_localContext);
             }
 
             // TODO: Implement MIPS2 instruction execution
@@ -250,7 +212,7 @@ contract MIPS2 is ISemver {
         }
     }
 
-    function handleSyscall(bytes32 _localContext, bytes32 _innerThreadRoot) internal returns (bytes32 out_) {
+    function handleSyscall(bytes32 _localContext) internal returns (bytes32 out_) {
         unchecked {
             // Load state from memory
             State memory state;
@@ -345,7 +307,7 @@ contract MIPS2 is ISemver {
                 } else if (a1 == sys.FUTEX_WAKE_PRIVATE) {
                     // Trigger thread traversal starting from the left stack until we find one waiting on the wakeup address
                     state.wakeup = a0;
-                    preemptThread(state, thread, _innerThreadRoot);
+                    preemptThread(state, thread);
                     state.traverseRight = false;
                     // Don't indicate to the program that we've woken up a waiting thread, as there are no guarantees.
                     // The woken up thread should indicate this in userspace.
@@ -356,12 +318,12 @@ contract MIPS2 is ISemver {
                     v1 = sys.EINVAL;
                }
             } else if (syscall_no == sys.SYS_SCHED_YIELD) {
-                preemptThread(state, thread, _innerThreadRoot);
+                preemptThread(state, thread);
             } else if (syscall_no == sys.SYS_OPEN) {
                 v0 = 0xFF_FF_FF_FF;
                 v1 = sys.EBADF;
             } else if (syscall_no == sys.SYS_NANOSLEEP) {
-                preemptThread(state, thread, _innerThreadRoot);
+                preemptThread(state, thread);
             }
 
             st.CpuScalars memory cpu = getCpuScalars(thread);
@@ -375,6 +337,8 @@ contract MIPS2 is ISemver {
     /// @notice Computes the hash of the MIPS state.
     /// @return out_ The hashed MIPS state.
     function outputState() internal returns (bytes32 out_) {
+        updateCurrentThreadRoot();
+
         assembly {
             // copies 'size' bytes, right-aligned in word at 'from', to 'to', incl. trailing data
             function copyMem(from, to, size) -> fromOut, toOut {
@@ -431,6 +395,23 @@ contract MIPS2 is ISemver {
         }
     }
 
+    /// @notice Updates the current thread stack root.
+    function updateCurrentThreadRoot() internal pure {
+        State memory state;
+        ThreadContext memory thread;
+        assembly {
+            state := 0x80
+            thread := 0x120
+        }
+        bytes32 updatedRoot = computeThreadRoot(loadThreadWitnessRoot(), thread);
+        if (state.traverseRight) {
+            state.rightThreadStack = updatedRoot;
+        } else {
+            state.leftThreadStack = updatedRoot;
+        }
+    }
+
+    /// @notice Completes the FUTEX_WAIT syscall.
     function onWaitComplete(State memory _state, ThreadContext memory _thread) internal returns (bytes32 out_) {
         // Clear the futex state
         _thread.futexAddr = 0xFF_FF_FF_FF;
@@ -448,15 +429,15 @@ contract MIPS2 is ISemver {
     }
 
     /// @notice Preempts the current thread for another and updates the VM state.
-    function preemptThread(State memory _state, ThreadContext memory _thread, bytes32 _innerThreadRoot) internal pure {
+    function preemptThread(State memory _state, ThreadContext memory _thread) internal pure {
         // pop thread from the current stack and push to the other stack
         if (_state.traverseRight) {
             require(_state.rightThreadStack != EMPTY_THREAD_ROOT, "empty right thread stack");
-            _state.rightThreadStack = _innerThreadRoot;
+            _state.rightThreadStack = loadThreadWitnessRoot();
             _state.leftThreadStack = computeThreadRoot(_state.leftThreadStack, _thread);
        }  else {
             require(_state.leftThreadStack != EMPTY_THREAD_ROOT, "empty left thread stack");
-           _state.leftThreadStack = _innerThreadRoot;
+           _state.leftThreadStack = loadThreadWitnessRoot();
             _state.rightThreadStack = computeThreadRoot(_state.rightThreadStack, _thread);
         }
         bytes32 current = _state.traverseRight ? _state.rightThreadStack : _state.leftThreadStack;
@@ -539,5 +520,62 @@ contract MIPS2 is ISemver {
         _tc.nextPC = _cpu.nextPC;
         _tc.lo = _cpu.lo;
         _tc.hi = _cpu.hi;
+    }
+
+    /// @notice Validates the thread witness in calldata against the current thread.
+    function validateThreadWitness(State memory _state, ThreadContext memory _thread) internal pure {
+        bytes32 witnessRoot = computeThreadRoot(loadThreadWitnessRoot(), _thread);
+        bytes32 expectedRoot = _state.traverseRight ? _state.rightThreadStack : _state.leftThreadStack;
+        require(expectedRoot == witnessRoot, "invalid thread witness");
+    }
+
+    /// @notice Sets the thread context from calldata.
+    function setThreadContextFromCalldata(ThreadContext memory _thread) internal pure {
+        uint256 s = 0;
+        assembly {
+            s := calldatasize()
+        }
+        // verify we have enough calldata
+        require(s >= (THREAD_PROOF_OFFSET + 166), "insufficient calldata for thread witness");
+
+        unchecked {
+            assembly {
+                function putField(callOffset, memOffset, size) -> callOffsetOut, memOffsetOut {
+                    // calldata is packed, thus starting left-aligned, shift-right to pad and right-align
+                    let w := shr(shl(3, sub(32, size)), calldataload(callOffset))
+                    mstore(memOffset, w)
+                    callOffsetOut := add(callOffset, size)
+                    memOffsetOut := add(memOffset, 32)
+                }
+
+                let c := THREAD_PROOF_OFFSET
+                let m := _thread
+                c, m := putField(c, m, 4) // threadID
+                c, m := putField(c, m, 1) // exitCode
+                c, m := putField(c, m, 1) // exited
+                c, m := putField(c, m, 4) // futexAddr
+                c, m := putField(c, m, 4) // futexVal
+                c, m := putField(c, m, 8) // futexTimeoutStep
+                c, m := putField(c, m, 4) // pc
+                c, m := putField(c, m, 4) // nextPC
+                c, m := putField(c, m, 4) // lo
+                c, m := putField(c, m, 4) // hi
+                // Unpack register calldata into memory
+                mstore(m, add(m, 32)) // offset to registers
+                m := add(m, 32)
+                for { let i := 0 } lt(i, 32) { i := add(i, 1) } { c, m := putField(c, m, 4) }
+            }
+        }
+    }
+
+    /// @notice Loads the inner thread witness root from calldata.
+    function loadThreadWitnessRoot() internal pure returns (bytes32 innerThreadRoot_) {
+        uint256 s = 0;
+        assembly {
+            s := calldatasize()
+            innerThreadRoot_ := calldataload(add(THREAD_PROOF_OFFSET, 166))
+        }
+        // verify we have enough calldata
+        require(s >= (THREAD_PROOF_OFFSET + 198), "insufficient calldata for thread witness"); // 166 + 32
     }
 }
