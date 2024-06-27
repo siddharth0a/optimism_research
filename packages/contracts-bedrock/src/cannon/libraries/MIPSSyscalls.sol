@@ -20,6 +20,8 @@ library MIPSSyscalls {
     uint32 internal constant SYS_GET_AFFINITY = 4240;
     uint32 internal constant SYS_CLOCK_GETTIME = 4263;
     uint32 internal constant SYS_FUTEX = 4238;
+    uint32 internal constant SYS_OPEN = 4005;
+    uint32 internal constant SYS_NANOSLEEP = 4166;
 
 
     uint32 internal constant FD_STDIN = 0;
@@ -32,6 +34,11 @@ library MIPSSyscalls {
 
     uint32 internal constant EBADF = 0x9;
     uint32 internal constant EINVAL = 0x16;
+    uint32 internal constant EAGAIN = 0xb;
+
+    uint32 internal constant FUTEX_WAIT_PRIVATE = 128;
+    uint32 internal constant FUTEX_WAKE_PRIVATE = 129;
+    uint32 internal constant FUTEX_TIMEOUT_STEPS = 10000;
 
     /// @notice Extract syscall num and arguments from registers.
     /// @param _registers The cpu registers.
@@ -39,10 +46,11 @@ library MIPSSyscalls {
     /// @return a0_ The first argument available to the syscall operation.
     /// @return a1_ The second argument available to the syscall operation.
     /// @return a2_ The third argument available to the syscall operation.
+    /// @return a3_ The fourth argument available to the syscall operation.
     function getSyscallArgs(uint32[32] memory _registers)
         internal
         pure
-        returns (uint32 sysCallNum_, uint32 a0_, uint32 a1_, uint32 a2_)
+        returns (uint32 sysCallNum_, uint32 a0_, uint32 a1_, uint32 a2_, uint32 a3_)
     {
         unchecked {
             sysCallNum_ = _registers[2];
@@ -50,8 +58,9 @@ library MIPSSyscalls {
             a0_ = _registers[4];
             a1_ = _registers[5];
             a2_ = _registers[6];
+            a3_ = _registers[7];
 
-            return (sysCallNum_, a0_, a1_, a2_);
+            return (sysCallNum_, a0_, a1_, a2_, a3_);
         }
     }
 
