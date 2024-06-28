@@ -236,7 +236,7 @@ contract MIPS2 is ISemver {
                 v0 = thread.threadID;
                 v1 = 0;
                 ThreadContext memory newThread = ThreadContext({
-                    threadID: thread.threadID + 1,
+                    threadID: v0,
                     exitCode: 0,
                     exited: false,
                     futexAddr: 0xFF_FF_FF_FF,
