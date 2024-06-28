@@ -57,11 +57,11 @@ contract MIPS2 is ISemver {
     /// @notice The preimage oracle contract.
     IPreimageOracle internal immutable ORACLE;
 
-    // The offset of the start of proof calldata (_memProof.offset) in the step() function
-    uint256 internal constant MEM_PROOF_OFFSET = 356;
-
     // The offset of the start of proof calldata (_threadWitness.offset) in the step() function
-    uint256 internal constant THREAD_PROOF_OFFSET = 1284;
+    uint256 internal constant THREAD_PROOF_OFFSET = 356;
+
+    // The offset of the start of proof calldata (_memProof.offset) in the step() function
+    uint256 internal constant MEM_PROOF_OFFSET = 612;
 
     // The empty thread root - keccak256(bytes32(0) ++ bytes32(0))
     bytes32 internal constant EMPTY_THREAD_ROOT = hex"ad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5";
@@ -74,12 +74,12 @@ contract MIPS2 is ISemver {
     /// @notice Executes a single step of the multi-threaded vm.
     ///         Will revert if any required input state is missing.
     /// @param _stateData The encoded state witness data.
-    /// @param _memProof The encoded proof data for leaves within the MIPS VM's memory.
     /// @param _threadWitness The encoded proof data for thread contexts.
-    ///                     It consists of the thread context and the immediate inner root of current thread stack. These two components are packed.
+    ///                     It's a packed tuple of the thread context and the immediate inner root of current thread stack.
+    /// @param _memProof The encoded proof data for leaves within the MIPS VM's memory.
     /// @param _localContext The local key context for the preimage oracle. Optional, can be set as a constant
     ///                      if the caller only requires one set of local keys.
-    function step(bytes calldata _stateData, bytes calldata _memProof, bytes calldata _threadWitness, bytes32 _localContext) public returns (bytes32) {
+    function step(bytes calldata _stateData, bytes calldata _threadWitness, bytes calldata _memProof, bytes32 _localContext) public returns (bytes32) {
         unchecked {
             State memory state;
             ThreadContext memory thread;
@@ -89,24 +89,25 @@ contract MIPS2 is ISemver {
                     // expected state mem offset check
                     revert(0, 0)
                 }
-                if iszero(eq(thread, 0x120)) {
+                if iszero(eq(thread, 0x1e0)) {
                     // expected thread mem offset check
                     revert(0, 0)
                 }
-                if iszero(eq(mload(0x40), shl(5, 58))) { // 4 + 10 + 43 + 1 = 58
-                    // expected memory check
+                if iszero(eq(mload(0x40), shl(5, 58))) {
+                    // 4 + 11 state slots + 43 thread slots = 58 expected memory check
                     revert(0, 0)
                 }
-                if iszero(eq(_stateData.offset, 132)) {
+                if iszero(eq(_stateData.offset, 164)) {
                     // 32*5+4=164 expected state data offset
                     revert(0, 0)
                 }
-                if iszero(eq(_memProof.offset, MEM_PROOF_OFFSET)) {
-                    // 164+160+32=356 expected proof offset
+                if iszero(eq(_threadWitness.offset, THREAD_PROOF_OFFSET)) {
+                    // 164+160+32=356 expected thread proof offset
                     revert(0, 0)
                 }
-                if iszero(eq(_threadWitness.offset, THREAD_PROOF_OFFSET)) {
-                    // 356+(28*32)+32=1284 expected thread proof offset
+                // TODO: move this to later. Only check proof when actually needed at instruction read
+                if iszero(eq(_memProof.offset, MEM_PROOF_OFFSET)) {
+                    // 356+224+32=612 expected memory proof offset
                     revert(0, 0)
                 }
 
@@ -217,7 +218,7 @@ contract MIPS2 is ISemver {
             ThreadContext memory thread;
             assembly {
                 state := 0x80
-                thread := 0x120
+                thread := 0x160
             }
 
             // Load the syscall numbers and args from the registers
@@ -366,6 +367,7 @@ contract MIPS2 is ISemver {
             let exited := mload(from)
             from, to := copyMem(from, to, 1) // exited
             from, to := copyMem(from, to, 8) // step
+            from, to := copyMem(from, to, 4) // wakeup
             from, to := copyMem(from, to, 1) // traverseRight
             from, to := copyMem(from, to, 32) // leftThreadStack
             from, to := copyMem(from, to, 32) // rightThreadStack
@@ -403,7 +405,7 @@ contract MIPS2 is ISemver {
         ThreadContext memory thread;
         assembly {
             state := 0x80
-            thread := 0x120
+            thread := 0x160
         }
         bytes32 updatedRoot = computeThreadRoot(loadThreadWitnessRoot(), thread);
         if (state.traverseRight) {
@@ -459,16 +461,8 @@ contract MIPS2 is ISemver {
 
     function computeThreadRoot(bytes32 _currentRoot, ThreadContext memory _thread) internal pure returns (bytes32 _out) {
         // w_i = hash(w_0 ++ hash(thread))
-        bytes32 newRoot;
         bytes32 threadRoot = outputThreadState(_thread);
-        assembly {
-            let memptr := mload(0x40) // free memory pointer
-            mstore(memptr, _currentRoot)
-            mstore(add(memptr, 0x20), threadRoot)
-            mstore(0x40, add(memptr, 0x40))
-            newRoot := keccak256(memptr, 0x40)
-        }
-        _out = newRoot;
+        _out = keccak256(abi.encodePacked(_currentRoot, threadRoot));
     }
 
     function outputThreadState(ThreadContext memory _thread) internal pure returns (bytes32 out_) {
