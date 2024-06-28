@@ -162,7 +162,7 @@ contract MIPS is ISemver {
                 state.exitCode = uint8(a0);
                 return outputState();
             } else if (syscall_no == sys.SYS_READ) {
-                sys.SysReadArgs memory args = sys.SysReadArgs({
+                sys.SysReadParams memory args = sys.SysReadParams({
                     a0: a0,
                     a1: a1,
                     a2: a2,

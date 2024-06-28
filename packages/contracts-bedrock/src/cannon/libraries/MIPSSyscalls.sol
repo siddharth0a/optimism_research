@@ -7,6 +7,27 @@ import { IPreimageOracle } from "src/cannon/interfaces/IPreimageOracle.sol";
 import { PreimageKeyLib } from "src/cannon/PreimageKeyLib.sol";
 
 library MIPSSyscalls {
+    struct SysReadParams {
+        /// @param _a0 The file descriptor.
+        uint32 a0;
+        /// @param _a1 The memory location where data should be read to.
+        uint32 a1;
+        /// @param _a2 The number of bytes to read from the file
+        uint32 a2;
+        /// @param _preimageKey The key of the preimage to read.
+        bytes32 preimageKey;
+        /// @param _preimageOffset The offset of the preimage to read.
+        uint32 preimageOffset;
+        /// @param _localContext The local context for the preimage key.
+        bytes32 localContext;
+        /// @param _oracle The address of the preimage oracle.
+        IPreimageOracle oracle;
+        /// @param _proofOffset The offset of the memory proof in calldata.
+        uint256 proofOffset;
+        /// @param _memRoot The current memory root.
+        bytes32 memRoot;
+    }
+
     uint32 internal constant SYS_MMAP = 4090;
     uint32 internal constant SYS_BRK = 4045;
     uint32 internal constant SYS_CLONE = 4120;
@@ -100,34 +121,13 @@ library MIPSSyscalls {
         }
     }
 
-    struct SysReadArgs {
-        /// @param _a0 The file descriptor.
-        uint32 a0;
-        /// @param _a1 The memory location where data should be read to.
-        uint32 a1;
-        /// @param _a2 The number of bytes to read from the file
-        uint32 a2;
-        /// @param _preimageKey The key of the preimage to read.
-        bytes32 preimageKey;
-        /// @param _preimageOffset The offset of the preimage to read.
-        uint32 preimageOffset;
-        /// @param _localContext The local context for the preimage key.
-        bytes32 localContext;
-        /// @param _oracle The address of the preimage oracle.
-        IPreimageOracle oracle;
-        /// @param _proofOffset The offset of the memory proof in calldata.
-        uint256 proofOffset;
-        /// @param _memRoot The current memory root.
-        bytes32 memRoot;
-    }
-
     /// @notice Like a Linux read syscall. Splits unaligned reads into aligned reads.
-    ///         Args are provided as a struct to avoid stack depth issues.
+    ///         Args are provided as a struct to reduce stack pressure.
     /// @return v0_ The number of bytes read, -1 on error.
     /// @return v1_ The error code, 0 if there is no error.
     /// @return newPreimageOffset_ The new value for the preimage offset.
     /// @return newMemRoot_ The new memory root.
-   function handleSysRead(SysReadArgs memory _args)
+   function handleSysRead(SysReadParams memory _args)
         internal
         view
         returns (uint32 v0_, uint32 v1_, uint32 newPreimageOffset_, bytes32 newMemRoot_)

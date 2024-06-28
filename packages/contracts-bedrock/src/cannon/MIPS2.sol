@@ -261,7 +261,7 @@ contract MIPS2 is ISemver {
                 state.exitCode = uint8(a0);
                 return outputState();
             } else if (syscall_no == sys.SYS_READ) {
-                sys.SysReadArgs memory args = sys.SysReadArgs({
+                sys.SysReadParams memory args = sys.SysReadParams({
                     a0: a0,
                     a1: a1,
                     a2: a2,
@@ -407,7 +407,7 @@ contract MIPS2 is ISemver {
             state := 0x80
             thread := 0x160
         }
-        bytes32 updatedRoot = computeThreadRoot(loadThreadWitnessRoot(), thread);
+        bytes32 updatedRoot = computeThreadRoot(loadInnerThreadRoot(), thread);
         if (state.traverseRight) {
             state.rightThreadStack = updatedRoot;
         } else {
@@ -437,11 +437,11 @@ contract MIPS2 is ISemver {
         // pop thread from the current stack and push to the other stack
         if (_state.traverseRight) {
             require(_state.rightThreadStack != EMPTY_THREAD_ROOT, "empty right thread stack");
-            _state.rightThreadStack = loadThreadWitnessRoot();
+            _state.rightThreadStack = loadInnerThreadRoot();
             _state.leftThreadStack = computeThreadRoot(_state.leftThreadStack, _thread);
        }  else {
             require(_state.leftThreadStack != EMPTY_THREAD_ROOT, "empty left thread stack");
-           _state.leftThreadStack = loadThreadWitnessRoot();
+           _state.leftThreadStack = loadInnerThreadRoot();
             _state.rightThreadStack = computeThreadRoot(_state.rightThreadStack, _thread);
         }
         bytes32 current = _state.traverseRight ? _state.rightThreadStack : _state.leftThreadStack;
@@ -520,7 +520,7 @@ contract MIPS2 is ISemver {
 
     /// @notice Validates the thread witness in calldata against the current thread.
     function validateThreadWitness(State memory _state, ThreadContext memory _thread) internal pure {
-        bytes32 witnessRoot = computeThreadRoot(loadThreadWitnessRoot(), _thread);
+        bytes32 witnessRoot = computeThreadRoot(loadInnerThreadRoot(), _thread);
         bytes32 expectedRoot = _state.traverseRight ? _state.rightThreadStack : _state.leftThreadStack;
         require(expectedRoot == witnessRoot, "invalid thread witness");
     }
@@ -564,8 +564,8 @@ contract MIPS2 is ISemver {
         }
     }
 
-    /// @notice Loads the inner thread witness root from calldata.
-    function loadThreadWitnessRoot() internal pure returns (bytes32 innerThreadRoot_) {
+    /// @notice Loads the inner root for the current thread hash onion from calldata.
+    function loadInnerThreadRoot() internal pure returns (bytes32 innerThreadRoot_) {
         uint256 s = 0;
         assembly {
             s := calldatasize()
