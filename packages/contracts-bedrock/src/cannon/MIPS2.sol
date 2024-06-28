@@ -31,7 +31,7 @@ contract MIPS2 is ISemver {
     }
 
     /// @notice Stores the VM state.
-    ///         Total state size: 32 + 32 + 4 * 4 + 1 + 1 + 8 + 4 + 1 + 32 + 32 = 159 bytes
+    ///         Total state size: 32 + 32 + 4 + 4 + 1 + 1 + 8 + 4 + 1 + 32 + 32 = 151 bytes
     ///         If nextPC != pc + 4, then the VM is executing a branch/jump delay slot.
     struct State {
         bytes32 memRoot;
@@ -218,7 +218,7 @@ contract MIPS2 is ISemver {
             ThreadContext memory thread;
             assembly {
                 state := 0x80
-                thread := 0x160
+                thread := 0x1e0
             }
 
             // Load the syscall numbers and args from the registers
@@ -405,7 +405,7 @@ contract MIPS2 is ISemver {
         ThreadContext memory thread;
         assembly {
             state := 0x80
-            thread := 0x160
+            thread := 0x1e0
         }
         bytes32 updatedRoot = computeThreadRoot(loadInnerThreadRoot(), thread);
         if (state.traverseRight) {

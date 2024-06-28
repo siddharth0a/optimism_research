@@ -61,6 +61,73 @@ contract MIPS2_Test is CommonTest {
         assertNotEq(post, bytes32(0));
     }
 
+    function test_add_succeeds() external {
+        uint32 insn = encodespec(17, 18, 8, 0x20); // add t0, s1, s2
+        (MIPS2.State memory state, MIPS2.ThreadContext memory thread, bytes memory memProof) = constructMIPSState(0, insn, 0x4, 0);
+        thread.registers[17] = 12;
+        thread.registers[18] = 20;
+        bytes memory encodedThread = encodeThread(thread);
+        bytes memory threadWitness = abi.encodePacked(encodedThread, EMPTY_THREAD_ROOT);
+        bytes32 threadRoot = keccak256(abi.encodePacked(EMPTY_THREAD_ROOT, keccak256(encodedThread)));
+        state.leftThreadStack = threadRoot;
+
+        uint32 result = thread.registers[17] + thread.registers[18]; // t0
+        MIPS2.State memory expect = arithmeticPostState(state, thread, 8 /* t0 */, result);
+
+        bytes32 postState = mips.step(encodeState(state), threadWitness, memProof, 0);
+        assertEq(postState, outputState(expect), "unexpected post state");
+    }
+
+    function test_addu_succeeds() external {
+        uint32 insn = encodespec(17, 18, 8, 0x21); // addu t0, s1, s2
+        (MIPS2.State memory state, MIPS2.ThreadContext memory thread, bytes memory memProof) = constructMIPSState(0, insn, 0x4, 0);
+        thread.registers[17] = 12;
+        thread.registers[18] = 20;
+        bytes memory encodedThread = encodeThread(thread);
+        bytes memory threadWitness = abi.encodePacked(encodedThread, EMPTY_THREAD_ROOT);
+        bytes32 threadRoot = keccak256(abi.encodePacked(EMPTY_THREAD_ROOT, keccak256(encodedThread)));
+        state.leftThreadStack = threadRoot;
+
+        uint32 result = thread.registers[17] + thread.registers[18]; // t0
+        MIPS2.State memory expect = arithmeticPostState(state, thread, 8 /* t0 */, result);
+
+        bytes32 postState = mips.step(encodeState(state), threadWitness, memProof, 0);
+        assertEq(postState, outputState(expect), "unexpected post state");
+    }
+
+    /// @notice constructs a generic MIPS2 state for single-threaded execution.
+    function constructMIPSState(
+        uint32 pc,
+        uint32 insn,
+        uint32 addr,
+        uint32 val
+    )
+        internal
+        returns (MIPS2.State memory state_, MIPS2.ThreadContext memory thread_, bytes memory proof_)
+    {
+        (state_.memRoot, proof_) = ffi.getCannonMemoryProof(pc, insn, addr, val);
+        state_.wakeup = 0xFF_FF_FF_FF;
+        thread_.pc = pc;
+        thread_.nextPC = pc + 4;
+        thread_.futexAddr = 0xFF_FF_FF_FF;
+    }
+
+    function arithmeticPostState(MIPS2.State memory _state, MIPS2.ThreadContext memory _thread, uint32 reg, uint32 val) internal pure returns (MIPS2.State memory out_) {
+        MIPS2.ThreadContext memory expectThread;
+        expectThread.pc = _thread.nextPC;
+        expectThread.nextPC = _thread.nextPC + 4;
+        expectThread.futexAddr = 0xFF_FF_FF_FF;
+        for (uint i = 0; i < _thread.registers.length; i++) {
+            expectThread.registers[i] = _thread.registers[i];
+        }
+        expectThread.registers[reg] = val;
+
+        out_.memRoot = _state.memRoot;
+        out_.step = _state.step + 1;
+        out_.wakeup = 0xFF_FF_FF_FF;
+        out_.leftThreadStack = keccak256(abi.encodePacked(EMPTY_THREAD_ROOT, keccak256(encodeThread(expectThread))));
+    }
+
     function encodeState(MIPS2.State memory _state) internal pure returns (bytes memory) {
         return abi.encodePacked(
             _state.memRoot,
@@ -95,5 +162,43 @@ contract MIPS2_Test is CommonTest {
             _thread.hi,
             registers
         );
+    }
+
+    /// @dev MIPS VM status codes:
+    ///      0. Exited with success (Valid)
+    ///      1. Exited with success (Invalid)
+    ///      2. Exited with failure (Panic)
+    ///      3. Unfinished
+    function vmStatus(MIPS2.State memory state) internal pure returns (VMStatus out_) {
+        if (!state.exited) {
+            return VMStatuses.UNFINISHED;
+        } else if (state.exitCode == 0) {
+            return VMStatuses.VALID;
+        } else if (state.exitCode == 1) {
+            return VMStatuses.INVALID;
+        } else {
+            return VMStatuses.PANIC;
+        }
+    }
+
+    function outputState(MIPS2.State memory state) internal pure returns (bytes32 out_) {
+        bytes memory enc = encodeState(state);
+        VMStatus status = vmStatus(state);
+        assembly {
+            out_ := keccak256(add(enc, 0x20), 151)
+            out_ := or(and(not(shl(248, 0xFF)), out_), shl(248, status))
+        }
+    }
+
+    function encodeitype(uint8 opcode, uint8 rs, uint8 rt, uint16 imm) internal pure returns (uint32 insn) {
+        insn = uint32(opcode) << 26 | uint32(rs) << 21 | uint32(rt) << 16 | imm;
+    }
+
+    function encodespec(uint8 rs, uint8 rt, uint8 rd, uint16 funct) internal pure returns (uint32 insn) {
+        insn = uint32(rs) << 21 | uint32(rt) << 16 | uint32(rd) << 11 | uint32(funct);
+    }
+
+    function encodespec2(uint8 rs, uint8 rt, uint8 rd, uint8 funct) internal pure returns (uint32 insn) {
+        insn = uint32(28) << 26 | uint32(rs) << 21 | uint32(rt) << 16 | uint32(rd) << 11 | uint32(funct);
     }
 }
