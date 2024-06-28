@@ -63,8 +63,8 @@ contract MIPS2 is ISemver {
     // The offset of the start of proof calldata (_threadWitness.offset) in the step() function
     uint256 internal constant THREAD_PROOF_OFFSET = 1284;
 
-    // TODO: Fill this with a valid empty thread root
-    bytes32 internal constant EMPTY_THREAD_ROOT = 0x0;
+    // The empty thread root - keccak256(bytes32(0) ++ bytes32(0))
+    bytes32 internal constant EMPTY_THREAD_ROOT = hex"ad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5";
 
     /// @param _oracle The address of the preimage oracle contract.
     constructor(IPreimageOracle _oracle) {
@@ -141,7 +141,6 @@ contract MIPS2 is ISemver {
             state.step += 1;
 
             // If we've completed traversing both stacks
-            // TODO: there's no thread witness in this case. So the above witness check would fail.
             if (state.traverseRight && state.rightThreadStack == EMPTY_THREAD_ROOT) {
                 state.traverseRight = false;
                 state.wakeup = 0xFF_FF_FF_FF;
@@ -195,7 +194,6 @@ contract MIPS2 is ISemver {
                 return handleSyscall(_localContext);
             }
 
-            // TODO: Implement MIPS2 instruction execution
             // Exec the rest of the step logic
             st.CpuScalars memory cpu = getCpuScalars(thread);
             (state.memRoot) = ins.execMipsCoreStepLogic({
@@ -233,25 +231,28 @@ contract MIPS2 is ISemver {
                 // brk: Returns a fixed address for the program break at 0x40000000
                 v0 = BRK_START;
             } else if (syscall_no == sys.SYS_CLONE) {
+                // TODO: Offchain, the thread ID must be monotonic and unique
                 v0 = thread.threadID;
                 v1 = 0;
-                ThreadContext memory newThread;
-                newThread.threadID = thread.threadID + 1;
-                newThread.futexAddr = 0xFF_FF_FF_FF;
-                newThread.lo = thread.lo;
-                newThread.hi = thread.hi;
-                newThread.registers = thread.registers;
+                ThreadContext memory newThread = ThreadContext({
+                    threadID: thread.threadID + 1,
+                    exitCode: 0,
+                    exited: false,
+                    futexAddr: 0xFF_FF_FF_FF,
+                    futexVal: 0,
+                    futexTimeoutStep: 0,
+                    pc: thread.nextPC,
+                    nextPC: thread.nextPC + 4,
+                    lo: thread.lo,
+                    hi: thread.hi,
+                    registers: thread.registers
+                });
                 newThread.registers[29] = a1; // set stack pointer
                 // the child will perceive a 0 value as returned value instead, and no error
                 newThread.registers[2] = 0;
                 newThread.registers[7] = 0;
 
-                // the new thread also has to continue with the next instruction
-                newThread.pc = thread.nextPC;
-                newThread.nextPC = thread.nextPC + 4;
-
                 // add the new thread context to the state
-                // TODO: this preempts the current thread for the new one immediately. Is this desirable?
                 pushThread(state, newThread);
             } else if (syscall_no == sys.SYS_EXIT_GROUP) {
                 // exit group: Sets the Exited and ExitCode states to true and argument 0.
@@ -259,17 +260,18 @@ contract MIPS2 is ISemver {
                 state.exitCode = uint8(a0);
                 return outputState();
             } else if (syscall_no == sys.SYS_READ) {
-                (v0, v1, state.preimageOffset, state.memRoot) = sys.handleSysRead({
-                    _a0: a0,
-                    _a1: a1,
-                    _a2: a2,
-                    _preimageKey: state.preimageKey,
-                    _preimageOffset: state.preimageOffset,
-                    _localContext: _localContext,
-                    _oracle: ORACLE,
-                    _proofOffset: MIPSMemory.memoryProofOffset(MEM_PROOF_OFFSET, 1),
-                    _memRoot: state.memRoot
+                sys.SysReadArgs memory args = sys.SysReadArgs({
+                    a0: a0,
+                    a1: a1,
+                    a2: a2,
+                    preimageKey: state.preimageKey,
+                    preimageOffset: state.preimageOffset,
+                    localContext: _localContext,
+                    oracle: ORACLE,
+                    proofOffset: MIPSMemory.memoryProofOffset(MEM_PROOF_OFFSET, 1),
+                    memRoot: state.memRoot
                 });
+                (v0, v1, state.preimageOffset, state.memRoot) = sys.handleSysRead(args);
             } else if (syscall_no == sys.SYS_WRITE) {
                 (v0, v1, state.preimageKey, state.preimageOffset) = sys.handleSysWrite({
                     _a0: a0,
@@ -288,7 +290,6 @@ contract MIPS2 is ISemver {
             } else if (syscall_no == sys.SYS_EXIT) {
                 thread.exited = true;
                 thread.exitCode = uint8(a0);
-                // TODO: preempt
                 return outputState();
             } else if (syscall_no == sys.SYS_FUTEX) {
                 // args: a0 = addr, a1 = op, a2 = val, a3 = timeout
@@ -325,6 +326,7 @@ contract MIPS2 is ISemver {
             } else if (syscall_no == sys.SYS_NANOSLEEP) {
                 preemptThread(state, thread);
             }
+            // TODO: no-op on the remaining whitelisted syscalls
 
             st.CpuScalars memory cpu = getCpuScalars(thread);
             sys.handleSyscallUpdates(cpu, thread.registers, v0, v1);
