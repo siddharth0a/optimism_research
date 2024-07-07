@@ -170,8 +170,9 @@ func NewDriver(
 ) *Driver {
 	var executor event.Executor
 	var drain func() error
-	// This instantiation will be one of more options: soon there will be a parallel events executor
-	{
+	if driverCfg.ParallelEventProcessing {
+		executor = event.NewParallelExec()
+	} else {
 		s := event.NewGlobalSynchronous()
 		executor = s
 		drain = s.Drain
