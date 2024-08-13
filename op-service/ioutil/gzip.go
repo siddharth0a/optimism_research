@@ -9,6 +9,19 @@ import (
 	"strings"
 )
 
+type gzipWriteCloser struct {
+	io.WriteCloser
+	closer io.Closer
+}
+
+// Close closes both the gzip.Writer and the underlying writer
+func (g *gzipWriteCloser) Close() error {
+	if err := g.WriteCloser.Close(); err != nil {
+		return err
+	}
+	return g.closer.Close()
+}
+
 // OpenDecompressed opens a reader for the specified file and automatically gzip decompresses the content
 // if the filename ends with .gz
 func OpenDecompressed(path string) (io.ReadCloser, error) {
@@ -70,7 +83,10 @@ func IsGzip(path string) bool {
 
 func CompressByFileType(file string, out io.WriteCloser) io.WriteCloser {
 	if IsGzip(file) {
-		return gzip.NewWriter(out)
+		return &gzipWriteCloser{
+			WriteCloser: gzip.NewWriter(out),
+			closer:      out,
+		}
 	}
 	return out
 }
