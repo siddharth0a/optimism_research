@@ -9,14 +9,29 @@ import (
 	"strings"
 )
 
-type gzipCloser struct {
+// gzipReadCloser is a struct that closes both the gzip.Reader and the underlying io.Closer.
+type gzipReadCloser struct {
+	reader io.ReadCloser
 	closer io.Closer
-	io.Closer
 }
 
-// Close closes both the gzip.Writer / Reader and the underlying writer / reader
-func (g *gzipCloser) Close() error {
-	if err := g.Closer.Close(); err != nil {
+// Close closes both the gzip.Reader and the underlying reader.
+func (g *gzipReadCloser) Close() error {
+	if err := g.reader.Close(); err != nil {
+		return err
+	}
+	return g.closer.Close()
+}
+
+// gzipWriteCloser is a struct that closes both the gzip.Writer and the underlying io.Closer.
+type gzipWriteCloser struct {
+	io.WriteCloser
+	closer io.Closer
+}
+
+// Close closes both the gzip.Writer and the underlying writer.
+func (g *gzipWriteCloser) Close() error {
+	if err := g.WriteCloser.Close(); err != nil {
 		return err
 	}
 	return g.closer.Close()
