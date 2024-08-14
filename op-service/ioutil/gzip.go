@@ -11,13 +11,13 @@ import (
 
 // gzipReadCloser is a struct that closes both the gzip.Reader and the underlying io.Closer.
 type gzipReadCloser struct {
-	reader io.ReadCloser
+	io.ReadCloser
 	closer io.Closer
 }
 
 // Close closes both the gzip.Reader and the underlying reader.
 func (g *gzipReadCloser) Close() error {
-	if err := g.reader.Close(); err != nil {
+	if err := g.ReadCloser.Close(); err != nil {
 		return err
 	}
 	return g.closer.Close()
