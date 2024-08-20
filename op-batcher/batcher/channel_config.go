@@ -11,6 +11,8 @@ type ChannelConfig struct {
 	// Number of epochs (L1 blocks) per sequencing window, including the epoch
 	// L1 origin block itself
 	SeqWindowSize uint64
+
+	// 채널 프레임이 확장될 수 있는 L1 블록의 최대 수
 	// The maximum number of L1 blocks that the inclusion transactions of a
 	// channel's frames can span.
 	ChannelTimeout uint64

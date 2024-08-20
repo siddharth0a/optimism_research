@@ -44,6 +44,7 @@ type frameData struct {
 	id   frameID
 }
 
+// ChannelBuilder는 channel과 output frame size 근사치를 생성하기 위해 ChannelOut을 사용한다
 // ChannelBuilder uses a ChannelOut to create a channel with output frame
 // size approximation.
 type ChannelBuilder struct {
@@ -74,14 +75,18 @@ type ChannelBuilder struct {
 	latestL2 eth.BlockID
 	// oldestL2 is the oldest L2 block of all the L2 blocks that have been added to the channel
 	oldestL2 eth.BlockID
+	// frame은 데이터 큐이다. txs로 보내진다.
 	// frames data queue, to be send as txs
 	frames []frameData
+	// 프레임 수
 	// total frames counter
 	numFrames int
 	// total amount of output data of all frames created yet
 	outputBytes int
 }
 
+// channel 생성하는 생성자
+// channel을 생성하거나, channel out을 생성할 수 없을 때 error을 return
 // NewChannelBuilder creates a new channel builder or returns an error if the
 // channel out could not be created.
 // it acts as a factory for either a span or singular channel out
@@ -226,6 +231,8 @@ func (c *ChannelBuilder) Timeout() uint64 {
 	return c.timeout
 }
 
+// FramePublished는 해당 channel의 frame이 published 될때
+// 프레임이 포함된 L1 블록의 L1-blocknumber와 함께 호출된다.
 // FramePublished should be called whenever a frame of this channel got
 // published with the L1-block number of the block that the frame got included
 // in.

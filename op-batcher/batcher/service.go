@@ -43,6 +43,8 @@ type BatcherConfig struct {
 	CheckRecentTxsDepth int
 }
 
+// BatcherService는 full batch-submitter 인스턴스와 리소스를 나타냄
+// 그리고 op-service CLI Lifecycle 인터페이스를 준수한다.
 // BatcherService represents a full batch-submitter instance and its resources,
 // and conforms to the op-service CLI Lifecycle interface.
 type BatcherService struct {
@@ -72,6 +74,9 @@ type BatcherService struct {
 	NotSubmittingOnStart bool
 }
 
+// BatcherServiceFromCLIConfig는 CLIConfig로부터 새 BatcherService를 생성
+// 해당 서비스 컴포넌츠는 driver를 제외하고 완전히 시작
+// lifecycle을 시작하기 전에 batches를 제출하지 않는다.
 // BatcherServiceFromCLIConfig creates a new BatcherService from a CLIConfig.
 // The service components are fully started, except for the driver,
 // which will not be submitting batches (if it was configured to) until the Start part of the lifecycle.
@@ -83,6 +88,7 @@ func BatcherServiceFromCLIConfig(ctx context.Context, version string, cfg *CLICo
 	return &bs, nil
 }
 
+// batcher service의 cliconfig 할당
 func (bs *BatcherService) initFromCLIConfig(ctx context.Context, version string, cfg *CLIConfig, log log.Logger) error {
 	bs.Version = version
 	bs.Log = log

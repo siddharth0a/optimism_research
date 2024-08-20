@@ -12,6 +12,7 @@ import (
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 )
 
+// Batche Submitter main entrypoint
 // Main is the entrypoint into the Batch Submitter.
 // This method returns a cliapp.LifecycleAction, to create an op-service CLI-lifecycle-managed batch-submitter with.
 func Main(version string) cliapp.LifecycleAction {
