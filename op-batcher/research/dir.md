@@ -9,7 +9,6 @@
                     // 외부에서 op-batcher에 요청 보내는 방식으로 데이터 주고받는 로직
                     // RPC 서버와 클라이언트 코드, 메시지 형식 정의 등 포함
 
-
 # file struct
 .
 ├── Makefile
