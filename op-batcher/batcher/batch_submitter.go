@@ -12,6 +12,8 @@ import (
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 )
 
+// Batche Submitter entrypoint
+// cliapp.LifecycleAction을 return하고, CLI-lifecycle-manage batch-submitter을 생성한다.
 // Batche Submitter main entrypoint
 // Main is the entrypoint into the Batch Submitter.
 // This method returns a cliapp.LifecycleAction, to create an op-service CLI-lifecycle-managed batch-submitter with.
