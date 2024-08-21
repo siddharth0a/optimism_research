@@ -4,14 +4,14 @@
 main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 BatchSubmitter 서비스를 시작
 
 ```plaintext
-/cmd main.go : main
+=>  : main
 ```
 
 ## /batcher/batch_submitter.go
 batch_submitter.go는 배처 서비스의 진입점 역할을 하며, CLI 설정을 통해 배처 서비스를 초기화하고 실행
 
 ```plaintext
-=> /batcher batch_submitter.go : Main
+=>  : Main
 ```
 
 ## /batcher/service.go
