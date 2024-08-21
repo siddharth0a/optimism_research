@@ -30,11 +30,15 @@ service.go는 배처 서비스의 CLIConfig를 설정하고, BatchSubmitter를 �
             : initAltDA
             : initMetricsServer
             : initDriver {
-                /batcher driver.go : NewBatchSubmitter
+                /batcher driver.go : NewBatchSubmitter {
+                    /batcher driver.go : NewChannelManager
+                }
             }
             : initRPCServer
-            : Start
         }
+    }
+    : Start {
+        : StartBatchSubmitting
     }
 ```
 
