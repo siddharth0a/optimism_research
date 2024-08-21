@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// L2EndpointProvider는 RollupClient와 l2 eth client를 제공하는 인터페이스
 // L2EndpointProvider is an interface for providing a RollupClient and l2 eth client
 // It manages the lifecycle of the RollupClient and eth client for callers
 // It does this by extending the RollupProvider interface to add the ability to get an EthClient
