@@ -85,8 +85,8 @@ type ChannelBuilder struct {
 	outputBytes int
 }
 
-// channel 생성하는 생성자
-// channel을 생성하거나, channel out을 생성할 수 없을 때 error을 return
+// channel builder 생성하는 생성자
+// channel builder를 생성하거나, channel out을 생성할 수 없을 때 error을 return
 // NewChannelBuilder creates a new channel builder or returns an error if the
 // channel out could not be created.
 // it acts as a factory for either a span or singular channel out
