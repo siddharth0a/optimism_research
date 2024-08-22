@@ -36,8 +36,6 @@ type RollupClient interface {
 ## L1 상호작용
 
 ```plaintext
-=> /batcher/driver.go
-
 => /batcher/driver.go : StartBatchSubmitting {
         : waitNodeSync // rollup node가 적절히 동기화되었는지 확인하는 전체 프로세스를 관리 {
             /op-service/dial/rollup_sync.go : WaitRollupSync // rollup 노드 싱크
@@ -54,7 +52,6 @@ type RollupClient interface {
     }
 
 ```
-
 
 
 ```go
@@ -182,4 +179,87 @@ func WaitRollupSync(
 
 ```
 
+## L2 RPC 상호작용
 
+
+배처(Batcher)가 제출하는 데이터의 출처는 주로 L2 노드(op-geth)에서 가져온 블록 데이터이지만, op-node(롤업 노드)도 동기화 상태를 관리하고, L2와 L1 간의 연계 정보를 제공하는 데 중요한 역할을 합니다. 이 두 가지를 조합하여 배처가 데이터를 준비하고 L1에 제출
+
+/batcher/driver.go
+
+```plaintext
+=>  loop {
+        : loadBlocksIntoState {
+            : calculateL2BlockRangeToStore // op-node에서 동기화 상태 관리 {
+                RollupClient
+            }
+            : loadBlockIntoState // op-geth에서 블록 데이터 추출 {
+                    EthClient
+            }
+        }
+    }
+
+```
+
+
+```go
+// calculateL2BlockRangeToStore determines the range (start,end] that should be loaded into the local state.
+// It also takes care of initializing some local state (i.e. will modify l.lastStoredBlock in certain conditions)
+func (l *BatchSubmitter) calculateL2BlockRangeToStore(ctx context.Context) (eth.BlockID, eth.BlockID, error) {
+	rollupClient, err := l.EndpointProvider.RollupClient(ctx)
+	if err != nil {
+		return eth.BlockID{}, eth.BlockID{}, fmt.Errorf("getting rollup client: %w", err)
+	}
+
+	cCtx, cancel := context.WithTimeout(ctx, l.Config.NetworkTimeout)
+	defer cancel()
+
+	syncStatus, err := rollupClient.SyncStatus(cCtx)
+	// Ensure that we have the sync status
+	if err != nil {
+		return eth.BlockID{}, eth.BlockID{}, fmt.Errorf("failed to get sync status: %w", err)
+	}
+	if syncStatus.HeadL1 == (eth.L1BlockRef{}) {
+		return eth.BlockID{}, eth.BlockID{}, errors.New("empty sync status")
+	}
+
+	// Check last stored to see if it needs to be set on startup OR set if is lagged behind.
+	// It lagging implies that the op-node processed some batches that were submitted prior to the current instance of the batcher being alive.
+	if l.lastStoredBlock == (eth.BlockID{}) {
+		l.Log.Info("Starting batch-submitter work at safe-head", "safe", syncStatus.SafeL2)
+		l.lastStoredBlock = syncStatus.SafeL2.ID()
+	} else if l.lastStoredBlock.Number < syncStatus.SafeL2.Number {
+		l.Log.Warn("Last submitted block lagged behind L2 safe head: batch submission will continue from the safe head now", "last", l.lastStoredBlock, "safe", syncStatus.SafeL2)
+		l.lastStoredBlock = syncStatus.SafeL2.ID()
+	}
+
+	// Check if we should even attempt to load any blocks. TODO: May not need this check
+	if syncStatus.SafeL2.Number >= syncStatus.UnsafeL2.Number {
+		return eth.BlockID{}, eth.BlockID{}, errors.New("L2 safe head ahead of L2 unsafe head")
+	}
+
+	return l.lastStoredBlock, syncStatus.UnsafeL2.ID(), nil
+}
+
+// loadBlockIntoState fetches & stores a single block into `state`. It returns the block it loaded.
+func (l *BatchSubmitter) loadBlockIntoState(ctx context.Context, blockNumber uint64) (*types.Block, error) {
+	l2Client, err := l.EndpointProvider.EthClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting L2 client: %w", err)
+	}
+
+	cCtx, cancel := context.WithTimeout(ctx, l.Config.NetworkTimeout)
+	defer cancel()
+
+	block, err := l2Client.BlockByNumber(cCtx, new(big.Int).SetUint64(blockNumber))
+	if err != nil {
+		return nil, fmt.Errorf("getting L2 block: %w", err)
+	}
+
+	if err := l.state.AddL2Block(block); err != nil {
+		return nil, fmt.Errorf("adding L2 block to state: %w", err)
+	}
+
+	l.Log.Info("Added L2 block to local state", "block", eth.ToBlockID(block), "tx_count", len(block.Transactions()), "time", block.Time())
+	return block, nil
+}
+```
