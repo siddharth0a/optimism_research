@@ -36,11 +36,20 @@ type RollupClient interface {
 ## L1 상호작용
 
 ```plaintext
-=> /batcher/driver.go : publishStateToL1 {
-        : publishTxToL1 {
-            : l1Tip // L1 블록체인의 현재 상태를 가져옴
+=> /batcher/driver.go
 
-
+=> /batcher/driver.go : StartBatchSubmitting {
+        : waitNodeSync // rollup node가 적절히 동기화되었는지 확인하는 전체 프로세스를 관리 {
+            /op-service/dial/rollup_sync.go : WaitRollupSync // rollup 노드 싱크
+        }
+        : loop {
+            : publishStateToL1 {
+                : publishTxToL1 {
+                    : l1Tip // L1 블록체인의 현재 상태를 가져옴
+                    /bathcer/channel_manager.go : TxData // L1에 제출해야할 데이터 추출
+                    : sendTransaction // L1에 Tx데이터 제출
+                }
+            }
         }
     }
 

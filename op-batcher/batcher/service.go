@@ -39,7 +39,8 @@ type BatcherConfig struct {
 	// will post inputs to the DA server and post commitments to blobs or calldata.
 	UseAltDA bool
 
-	WaitNodeSync        bool
+	WaitNodeSync bool
+	// 최근 제출된 배치 트랜잭션이 L1에서 충분한 블록 확인을 거쳐 최종적으로 확정되었는지 확인
 	CheckRecentTxsDepth int
 }
 
