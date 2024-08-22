@@ -56,23 +56,23 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
 ```plaintext
 =>  : StartBatchSubmitting {
         loop {
-            make(chan struct{})
-            txpoolState.Store(TxpoolGood)
-            handleReceipt(r)
-            publishStateToL1(queue, receiptCh)
-            loadBlocksIntoState {
-                calculateL2BlockRangeToStore
-                loadBlockIntoState
-                L2BlockToBlockRef {
+            : make(chan struct{})
+            : txpoolState.Store(TxpoolGood)
+            : handleReceipt(r)
+            : publishStateToL1(queue, receiptCh)
+            : loadBlocksIntoState {
+                : calculateL2BlockRangeToStore
+                : loadBlockIntoState
+                : L2BlockToBlockRef {
                     /batcher/channel_manager.go : AddL2Block
                 }
-                RecordL2BlocksLoaded
+                : RecordL2BlocksLoaded
             }
-            publishStateToL1 {
-                publishTxToL1 {
+            : publishStateToL1 {
+                : publishTxToL1 {
                     /batcher/channel_manager.go : TxData
-                    sendTransaction
-                    => : blob or CallData
+                    : sendTransaction
+                    => blob or CallData
                 }
             }
         }
@@ -103,10 +103,10 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
 
 ```plaintext
 =>  : TxData {
-        ensureChannelWithSpace {
+        : ensureChannelWithSpace {
             /batcher/channel.go : newChannel
         }
-        processBlocks {
+        : processBlocks {
             /batcher/channel.go : AddBlock {
                 /batcher/channel_builder.go : AddBlock {
                     /op-node/rollup/derive/channel_out.go : BlockToSingularBatch
