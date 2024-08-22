@@ -6,6 +6,9 @@ main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 
 ```plaintext
 =>  : main {
         /batcher/batch_submitter.go : Main
+        /op-service/cliapp/lifecycle.go : LifecycleCmd {
+            /batcher/service.go : Start
+        }
 }
 ```
 
@@ -80,7 +83,9 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
 channel.go는 블록 데이터를 처리하고, 이를 채널에 프레임으로 전환하여 L1에 제출하기 위한 역할을 담당
 
 ```plaintext
-=>  : newChannel
+=>  : newChannel {
+    /batcher/channel_builder.go : NewChannelBuilder
+}
 ```
 
 ## channel_builder.go
@@ -102,15 +107,17 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
             /batcher/channel.go : newChannel
         }
         processBlocks {
-            /batcher/channel.go : AddBlock
+            /batcher/channel.go : AddBlock {
+                /batcher/channel_builder.go : AddBlock {
+                    /op-node/rollup/derive/channel_out.go : BlockToSingularBatch
+                    /op-node/rollup/derive/channel_out.go : AddSingularBatch
+                }
+            }
             : l2BlockRefFromBlockAndL1Info
-            : RecordL2BlockInChannel
-            : RecordL2BlocksAdded
         }
-        registerL1Block
-        outputFrames {
+        : registerL1Block
+        : outputFrames {
             /batcher/channel.go : OutputFrames
-            : RecordChannelClosed
         }
         : nextTxData
     }
