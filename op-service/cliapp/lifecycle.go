@@ -23,6 +23,7 @@ type Lifecycle interface {
 	Stopped() bool
 }
 
+// LifecycleAciton 함수 구조체?
 // LifecycleAction instantiates a Lifecycle based on a CLI context.
 // With the close argument a lifecycle may choose to shut itself down.
 // A service may choose to idle, dump debug information or otherwise delay
@@ -31,6 +32,7 @@ type LifecycleAction func(ctx *cli.Context, close context.CancelCauseFunc) (Life
 
 var interruptErr = errors.New("interrupt signal")
 
+// fn LifecycleAction ?
 // LifecycleCmd turns a LifecycleAction into an CLI action,
 // by instrumenting it with CLI context and signal based termination.
 // The signals are caught with the opio.BlockFn attached to the context, if any.
