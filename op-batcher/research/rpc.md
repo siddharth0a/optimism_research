@@ -101,6 +101,8 @@ func (l *BatchSubmitter) l1Tip(ctx context.Context) (eth.L1BlockRef, error) {
 // still needs more block confirmations before being considered finalized
 func (l *BatchSubmitter) waitNodeSync() error {
 	ctx := l.shutdownCtx
+
+    // rollupClient (op-node) 가져오기
 	rollupClient, err := l.EndpointProvider.RollupClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get rollup client: %w", err)
@@ -109,6 +111,7 @@ func (l *BatchSubmitter) waitNodeSync() error {
 	cCtx, cancel := context.WithTimeout(ctx, l.Config.NetworkTimeout)
 	defer cancel()
 
+    // L1 블록체인 현재 상태 나타내는 L1tip 가져옴
 	l1Tip, err := l.l1Tip(cCtx)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve l1 tip: %w", err)
@@ -117,6 +120,7 @@ func (l *BatchSubmitter) waitNodeSync() error {
 	l1TargetBlock := l1Tip.Number
 	if l.Config.CheckRecentTxsDepth != 0 {
 		l.Log.Info("Checking for recently submitted batcher transactions on L1")
+        // 최근에 제출된 배치 트랜잭션 있는지 확인
 		recentBlock, found, err := eth.CheckRecentTxs(cCtx, l.L1Client, l.Config.CheckRecentTxsDepth, l.Txmgr.From())
 		if err != nil {
 			return fmt.Errorf("failed checking recent batcher txs: %w", err)
@@ -125,8 +129,46 @@ func (l *BatchSubmitter) waitNodeSync() error {
 			"l1_head", l1Tip, "l1_recent", recentBlock, "found", found)
 		l1TargetBlock = recentBlock
 	}
-
+    // 롤업 노드 동기화 대기
 	return dial.WaitRollupSync(l.shutdownCtx, l.Log, rollupClient, l1TargetBlock, time.Second*12)
+}
+```
+
+op-node, L1 싱크
+```go
+func WaitRollupSync(
+	ctx context.Context,
+	lgr log.Logger,
+	rollup SyncStatusProvider,
+	l1BlockTarget uint64,
+	pollInterval time.Duration,
+) error {
+	timer := time.NewTimer(pollInterval)
+	defer timer.Stop()
+
+	for {
+		syncst, err := rollup.SyncStatus(ctx)
+		if err != nil {
+			// don't log assuming caller handles and logs errors
+			return fmt.Errorf("getting sync status: %w", err)
+		}
+
+		lgr := lgr.With("current_l1", syncst.CurrentL1, "target_l1", l1BlockTarget)
+		if syncst.CurrentL1.Number >= l1BlockTarget {
+			lgr.Info("rollup current L1 block target reached")
+			return nil
+		}
+
+		lgr.Info("rollup current L1 block still behind target, retrying")
+
+		timer.Reset(pollInterval)
+		select {
+		case <-timer.C: // next try
+		case <-ctx.Done():
+			lgr.Warn("waiting for rollup sync timed out")
+			return ctx.Err()
+		}
+	}
 }
 
 ```

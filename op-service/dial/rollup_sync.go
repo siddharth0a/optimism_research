@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// 롤업노드 싱크대기
 func WaitRollupSync(
 	ctx context.Context,
 	lgr log.Logger,

@@ -393,11 +393,19 @@ func (l *BatchSubmitter) loop() {
 	}
 }
 
-// batcher tx가 최근에 보내졌는지 확인
+// 노드 싱크 대기
+
+// 최근 특정깊이만큼 탐색해서 최근 제출한 배처 트랜잭션을 찾는것과 노드싱크와 관계
+// : 트랜잭션이 제출되었다고 즉시 확정되는것이 아님, 트랜잭션이 finalize되기 위해 몇개의 블록이
+// 추가적으로 생성되어야하고, reorg, 트랜잭션 무효화 가능성을 줄일 수 있음
+// L1 블록체인의 특정 블록까지 동기화가 완료되어야 함 => 가장 최근에 제출한 batcher tx 블록
+
 // waitNodeSync Check to see if there was a batcher tx sent recently that
 // still needs more block confirmations before being considered finalized
 func (l *BatchSubmitter) waitNodeSync() error {
 	ctx := l.shutdownCtx
+
+	// rollupClient (op-node) 가져오기
 	rollupClient, err := l.EndpointProvider.RollupClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get rollup client: %w", err)
@@ -406,23 +414,28 @@ func (l *BatchSubmitter) waitNodeSync() error {
 	cCtx, cancel := context.WithTimeout(ctx, l.Config.NetworkTimeout)
 	defer cancel()
 
+	// L1 블록체인 현재 상태 나타내는 L1tip 가져옴
 	l1Tip, err := l.l1Tip(cCtx)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve l1 tip: %w", err)
 	}
-
+	// L1tip에서 가져온 현재 블록번호를 targetBlock으로 설정
 	l1TargetBlock := l1Tip.Number
+	// Check 할 txDepth가 0이 아니면 최근에 제출된 배치 트랜잭션 유무 확인
 	if l.Config.CheckRecentTxsDepth != 0 {
 		l.Log.Info("Checking for recently submitted batcher transactions on L1")
+		// 최근에 제출된 배치 트랜잭션 있는지 확인
+		// recentBlock을 최근 트랜잭션으로 설정
 		recentBlock, found, err := eth.CheckRecentTxs(cCtx, l.L1Client, l.Config.CheckRecentTxsDepth, l.Txmgr.From())
 		if err != nil {
 			return fmt.Errorf("failed checking recent batcher txs: %w", err)
 		}
 		l.Log.Info("Checked for recently submitted batcher transactions on L1",
 			"l1_head", l1Tip, "l1_recent", recentBlock, "found", found)
+		// targetblock을 recentBlock으로 설정
 		l1TargetBlock = recentBlock
 	}
-
+	// 롤업 노드 동기화 대기
 	return dial.WaitRollupSync(l.shutdownCtx, l.Log, rollupClient, l1TargetBlock, time.Second*12)
 }
 
