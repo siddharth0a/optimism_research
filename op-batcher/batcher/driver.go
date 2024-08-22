@@ -42,6 +42,7 @@ type txRef struct {
 	isBlob   bool
 }
 
+// L1Clinet와 상호작용하는 interface
 type L1Client interface {
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
@@ -392,6 +393,7 @@ func (l *BatchSubmitter) loop() {
 	}
 }
 
+// batcher tx가 최근에 보내졌는지 확인
 // waitNodeSync Check to see if there was a batcher tx sent recently that
 // still needs more block confirmations before being considered finalized
 func (l *BatchSubmitter) waitNodeSync() error {
@@ -493,6 +495,7 @@ func (l *BatchSubmitter) publishTxToL1(ctx context.Context, queue *txmgr.Queue[t
 	l.recordL1Tip(l1tip)
 
 	// Collect next transaction data
+	// L1 tx데이터 추출
 	txdata, err := l.state.TxData(l1tip.ID())
 
 	if err == io.EOF {
@@ -658,6 +661,7 @@ func (l *BatchSubmitter) recordConfirmedTx(id txID, receipt *types.Receipt) {
 func (l *BatchSubmitter) l1Tip(ctx context.Context) (eth.L1BlockRef, error) {
 	tctx, cancel := context.WithTimeout(ctx, l.Config.NetworkTimeout)
 	defer cancel()
+	// 블록 헤더 추출
 	head, err := l.L1Client.HeaderByNumber(tctx, nil)
 	if err != nil {
 		return eth.L1BlockRef{}, fmt.Errorf("getting latest L1 block: %w", err)

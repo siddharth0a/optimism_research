@@ -122,7 +122,3 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
         : nextTxData
     }
 ```
-
-
-# 데이터 플로우
-

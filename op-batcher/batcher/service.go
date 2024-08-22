@@ -135,6 +135,7 @@ func (bs *BatcherService) initFromCLIConfig(ctx context.Context, version string,
 }
 
 func (bs *BatcherService) initRPCClients(ctx context.Context, cfg *CLIConfig) error {
+	// L1 연결
 	l1Client, err := dial.DialEthClientWithTimeout(ctx, dial.DefaultDialTimeout, bs.Log, cfg.L1EthRpc)
 	if err != nil {
 		return fmt.Errorf("failed to dial L1 RPC: %w", err)
@@ -143,7 +144,9 @@ func (bs *BatcherService) initRPCClients(ctx context.Context, cfg *CLIConfig) er
 
 	var endpointProvider dial.L2EndpointProvider
 	if strings.Contains(cfg.RollupRpc, ",") && strings.Contains(cfg.L2EthRpc, ",") {
+		// L2 op-node 연결
 		rollupUrls := strings.Split(cfg.RollupRpc, ",")
+		// L2 op-geth 연결
 		ethUrls := strings.Split(cfg.L2EthRpc, ",")
 		endpointProvider, err = dial.NewActiveL2EndpointProvider(ctx, ethUrls, rollupUrls, cfg.ActiveSequencerCheckDuration, dial.DefaultDialTimeout, bs.Log)
 	} else {
