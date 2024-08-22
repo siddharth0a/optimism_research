@@ -4,14 +4,18 @@
 main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 BatchSubmitter 서비스를 시작
 
 ```plaintext
-=>  : main
+=>  : main {
+        /batcher/batch_submitter.go : Main
+}
 ```
 
 ## /batcher/batch_submitter.go
 batch_submitter.go는 배처 서비스의 진입점 역할을 하며, CLI 설정을 통해 배처 서비스를 초기화하고 실행
 
 ```plaintext
-=>  : Main
+=>  : Main {
+        /batcher/service.go : BatcherServiceFromCLIConfig
+}
 ```
 
 ## /batcher/service.go
@@ -30,15 +34,15 @@ service.go는 배처 서비스의 CLIConfig를 설정하고, BatchSubmitter를 �
             : initAltDA
             : initMetricsServer
             : initDriver {
-                /batcher driver.go : NewBatchSubmitter {
-                    /batcher driver.go : NewChannelManager
+                /batcher/driver.go : NewBatchSubmitter {
+                    /batcher/driver.go : NewChannelManager
                 }
             }
             : initRPCServer
         }
     }
     : Start {
-        : StartBatchSubmitting
+        /batcher/driver.go : StartBatchSubmitting
     }
 ```
 
@@ -57,13 +61,13 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
                 calculateL2BlockRangeToStore
                 loadBlockIntoState
                 L2BlockToBlockRef {
-                    /batcher channel_manager.go : AddL2Block
+                    /batcher/channel_manager.go : AddL2Block
                 }
                 RecordL2BlocksLoaded
             }
             publishStateToL1 {
                 publishTxToL1 {
-                    TxData
+                    /batcher/channel_manager.go : TxData
                     sendTransaction
                     => : blob or CallData
                 }
@@ -84,8 +88,8 @@ channel_builder.go는 채널 빌더를 초기화하고, 데이터를 압축 및 
 
 ```plaintext
 =>  : NewChannelBuilder {
-        /compressor config.go  : NewCompressor
-        /op-node/rollup/derive : NewSpanChannelOut
+        /compressor/config.go  : NewCompressor
+        /op-node/rollup/derive.go : NewSpanChannelOut
     }
 ```
 
@@ -95,17 +99,17 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
 ```plaintext
 =>  : TxData {
         ensureChannelWithSpace {
-            /batcher channel.go : newChannel
+            /batcher/channel.go : newChannel
         }
         processBlocks {
-            /batcher channel.go : AddBlock
+            /batcher/channel.go : AddBlock
             : l2BlockRefFromBlockAndL1Info
             : RecordL2BlockInChannel
             : RecordL2BlocksAdded
         }
         registerL1Block
         outputFrames {
-            /batcher channel.go : OutputFrames
+            /batcher/channel.go : OutputFrames
             : RecordChannelClosed
         }
         : nextTxData
