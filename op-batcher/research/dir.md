@@ -1,4 +1,5 @@
 # dir struct
+```plaintext
 .
 ├── batcher         // 배처 핵심 로직
 ├── cmd             // 커맨드라인 인터페이스 로직, entry point
@@ -8,8 +9,9 @@
 └── rpc             // Remote Procedure Call 코드, 다른 서비스와 상호작용하거나
                     // 외부에서 op-batcher에 요청 보내는 방식으로 데이터 주고받는 로직
                     // RPC 서버와 클라이언트 코드, 메시지 형식 정의 등 포함
-
+```
 # file struct
+```plaintext
 .
 ├── Makefile
 ├── batcher
@@ -41,5 +43,4 @@
 │   └── dir.md
 └── rpc
     └── api.go                      // RPC API 관련 로직
-
-
+```
