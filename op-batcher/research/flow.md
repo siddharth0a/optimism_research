@@ -65,8 +65,16 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
             : publishStateToL1(queue, receiptCh) {      // State publish to L1
                 : publishTxToL1 {
                     /batcher/channel_manager.go : TxData
-                    : sendTransaction
-                    => blob or CallData
+                    : sendTransaction {
+                        {
+                            : blobTxCandidate
+                            or
+                            : calldataTxCandidate
+                        }
+                        : queueTx {
+                            /op-service/txmgr/queue.go : Send
+                        }
+                    }
                 }
             }
         }

@@ -55,7 +55,26 @@ service.go는 배처 서비스의 CLIConfig를 설정하고, L2OutputSubmitter �
             /op-service/dial/rollup_sync.go : WaitRollupSync
         }
         : loop {
-
+            {
+                : FetchL2OOOutput       // L2 Output Oracle
+                or
+                : FetchDGFOutput        // Dispute Game Factory
+            }
+            : proposeOutput {
+                : sendTransaction {
+                    : waitForL1Head
+                    {
+                        : ProposeL2OutputDGFTxCandidate
+                        : Send          // TODO: Send 파악
+                        or
+                        : ProposeL2OutputTxData
+                        : Send          // TODO: Send 파악
+                    }
+                }
+                /metrics/metrics.go : RecordL2BlocksProposed {
+                    /op-service/metrics/ref_metrics.go : RecordL2Ref
+                }
+            }
         }
 
 }
