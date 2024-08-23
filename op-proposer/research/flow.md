@@ -54,5 +54,8 @@ service.go는 배처 서비스의 CLIConfig를 설정하고, L2OutputSubmitter �
         : waitNodeSync {
             /op-service/dial/rollup_sync.go : WaitRollupSync
         }
+        : loop {
+
+        }
 
 }

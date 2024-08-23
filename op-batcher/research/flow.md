@@ -1,7 +1,7 @@
 # 주요 작동 플로우
 
 ## /cmd/main.go
-main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 BatchSubmitter 서비스를 시작
+main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 batcher 서비스를 시작
 
 ```plaintext
 =>  : main {
@@ -10,11 +10,12 @@ main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 
                 /batcher/service.go : BatcherServiceFromCLIConfig   // 배처 서비스의 진입점, CLI 설정을 통해 배처 서비스를 초기화하고 실행
             }
             /op-service/cliapp/lifecycle.go : LifecycleCmd {
-                        /batcher/service.go : Start
-                    }
+                        /batcher/service.go : Start {
+                            /batcher/driver.go : StartBatchSubmitting
+                        }
+            }
         }
-
-}
+    }
 ```
 
 ## /batcher/service.go
@@ -32,17 +33,15 @@ service.go는 배처 서비스의 CLIConfig를 설정하고, BatchSubmitter를 �
             : initPProf
             : initAltDA
             : initMetricsServer
+            : initRPCServer
             : initDriver {
                 /batcher/driver.go : NewBatchSubmitter {
                     /batcher/driver.go : NewChannelManager
                 }
             }
-            : initRPCServer
         }
     }
-    : Start {
-        /batcher/driver.go : StartBatchSubmitting
-    }
+    :
 ```
 
 
@@ -50,7 +49,7 @@ service.go는 배처 서비스의 CLIConfig를 설정하고, BatchSubmitter를 �
 driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭션을 L1 블록체인에 제출하고 상태를 관리하는 역할
 
 ```plaintext
-=>  : StartBatchSubmitting {
+=>  : StartBatchSubmitting { // TODO: waitNodeSync 추가
         loop {
             : make(chan struct{})
             : txpoolState.Store(TxpoolGood)
