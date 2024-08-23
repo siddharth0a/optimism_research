@@ -5,10 +5,13 @@ main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 
 
 ```plaintext
 =>  : main {
-        /batcher/batch_submitter.go : Main
-        /op-service/cliapp/lifecycle.go : LifecycleCmd {
-            /batcher/service.go : Start
+        /op-service/cliapp/lifecycle.go: RunContext{
+            /batcher/batch_submitter.go : Main
+            /op-service/cliapp/lifecycle.go : LifecycleCmd {
+                        /batcher/service.go : Start
+                    }
         }
+
 }
 ```
 
@@ -59,8 +62,7 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
             : make(chan struct{})
             : txpoolState.Store(TxpoolGood)
             : handleReceipt(r)
-            : publishStateToL1(queue, receiptCh)
-            : loadBlocksIntoState {
+            : loadBlocksIntoState {                     // 블록 정보 load to state
                 : calculateL2BlockRangeToStore
                 : loadBlockIntoState
                 : L2BlockToBlockRef {
@@ -68,7 +70,7 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
                 }
                 : RecordL2BlocksLoaded
             }
-            : publishStateToL1 {
+            : publishStateToL1(queue, receiptCh) {      // State publish to L1
                 : publishTxToL1 {
                     /batcher/channel_manager.go : TxData
                     : sendTransaction
@@ -84,18 +86,11 @@ channel.go는 블록 데이터를 처리하고, 이를 채널에 프레임으로
 
 ```plaintext
 =>  : newChannel {
-    /batcher/channel_builder.go : NewChannelBuilder
-}
-```
-
-## channel_builder.go
-channel_builder.go는 채널 빌더를 초기화하고, 데이터를 압축 및 프레임으로 변환하는 작업을 수행
-
-```plaintext
-=>  : NewChannelBuilder {
+    /batcher/channel_builder.go : NewChannelBuilder {
         /compressor/config.go  : NewCompressor
         /op-node/rollup/derive.go : NewSpanChannelOut
     }
+}
 ```
 
 ## channel_manager.go
@@ -120,5 +115,65 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
             /batcher/channel.go : OutputFrames
         }
         : nextTxData
+    }
+```
+
+
+## 전체 핵심 플로우
+
+```plaintext
+=>  : main {
+        /op-service/cliapp/lifecycle.go: RunContext{
+            /batcher/batch_submitter.go : Main
+            /op-service/cliapp/lifecycle.go : LifecycleCmd {
+                /batcher/service.go : Start {
+                    /batcher/driver.go : StartBatchSubmitting {
+                        loop {
+                            : make(chan struct{})
+                            : txpoolState.Store(TxpoolGood)
+                            : handleReceipt(r)
+                            : loadBlocksIntoState {                     // 블록 정보 load to state
+                                : calculateL2BlockRangeToStore
+                                : loadBlockIntoState
+                                : L2BlockToBlockRef {
+                                    /batcher/channel_manager.go : AddL2Block
+                                }
+                                : RecordL2BlocksLoaded
+                            }
+                            : publishStateToL1(queue, receiptCh) {      // State publish to L1
+                                : publishTxToL1 {
+                                    /batcher/channel_manager.go : TxData {
+                                        : ensureChannelWithSpace {
+                                            /batcher/channel.go : newChannel {
+                                                /batcher/channel_builder.go : NewChannelBuilder {
+                                                    /compressor/config.go  : NewCompressor
+                                                    /op-node/rollup/derive.go : NewSpanChannelOut
+                                                }
+                                            }
+                                        }
+                                        : processBlocks {
+                                            /batcher/channel.go : AddBlock {
+                                                /batcher/channel_builder.go : AddBlock {
+                                                    /op-node/rollup/derive/channel_out.go : BlockToSingularBatch
+                                                    /op-node/rollup/derive/channel_out.go : AddSingularBatch
+                                                }
+                                            }
+                                            : l2BlockRefFromBlockAndL1Info
+                                        }
+                                        : registerL1Block
+                                        : outputFrames {
+                                            /batcher/channel.go : OutputFrames
+                                        }
+                                        : nextTxData
+                                    }
+                                    : sendTransaction
+                                    => blob or CallData
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 ```

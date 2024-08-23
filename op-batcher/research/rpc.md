@@ -190,10 +190,12 @@ func WaitRollupSync(
 =>  loop {
         : loadBlocksIntoState {
             : calculateL2BlockRangeToStore // op-node에서 동기화 상태 관리 {
-                RollupClient
+                RollupClient {
+                    op-conductor/rpc/node_proxy.go : SyncStatus
+                }
             }
             : loadBlockIntoState // op-geth에서 블록 데이터 추출 {
-                    EthClient
+                EthClient
             }
         }
     }
@@ -263,3 +265,5 @@ func (l *BatchSubmitter) loadBlockIntoState(ctx context.Context, blockNumber uin
 	return block, nil
 }
 ```
+
+
