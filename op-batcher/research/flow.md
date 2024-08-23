@@ -6,21 +6,14 @@ main.go는 애플리케이션의 진입점으로, 초기 설정을 수행하고 
 ```plaintext
 =>  : main {
         /op-service/cliapp/lifecycle.go: RunContext{
-            /batcher/batch_submitter.go : Main
+            /batcher/batch_submitter.go : Main {
+                /batcher/service.go : BatcherServiceFromCLIConfig   // 배처 서비스의 진입점, CLI 설정을 통해 배처 서비스를 초기화하고 실행
+            }
             /op-service/cliapp/lifecycle.go : LifecycleCmd {
                         /batcher/service.go : Start
                     }
         }
 
-}
-```
-
-## /batcher/batch_submitter.go
-batch_submitter.go는 배처 서비스의 진입점 역할을 하며, CLI 설정을 통해 배처 서비스를 초기화하고 실행
-
-```plaintext
-=>  : Main {
-        /batcher/service.go : BatcherServiceFromCLIConfig
 }
 ```
 
@@ -120,11 +113,14 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
 
 
 ## 전체 핵심 플로우
+*함수 위치는 일부 생략
 
 ```plaintext
 =>  : main {
         /op-service/cliapp/lifecycle.go: RunContext{
-            /batcher/batch_submitter.go : Main
+            /batcher/batch_submitter.go : Main {
+                /batcher/service.go : BatcherServiceFromCLIConfig   // 배처 서비스의 진입점, CLI 설정을 통해 배처 서비스를 초기화하고 실행
+            }
             /op-service/cliapp/lifecycle.go : LifecycleCmd {
                 /batcher/service.go : Start {
                     /batcher/driver.go : StartBatchSubmitting {
