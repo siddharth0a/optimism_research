@@ -157,7 +157,7 @@ channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하�
                                             : l2BlockRefFromBlockAndL1Info  // L2 블록 참조 생성
                                         }
                                         : registerL1Block                    // L1 블록을 채널에 등록
-                                        : outputFrames {
+                                        : outputFrames {                    // 현재 채널에서 프레임을 생성
                                             /batcher/channel.go : OutputFrames // 데이터를 프레임으로 변환하여 출력
                                         }
                                         : nextTxData                         // 다음 트랜잭션 데이터 준비
