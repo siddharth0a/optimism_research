@@ -29,12 +29,12 @@
 │   ├── metrics.go                       // 성능 모니터링 지표를 수집하고 보고하는 로직
 │   └── noop.go                          // 비활성화된 성능 모니터링 기능을 처리하기 위한 'no-operation' 코드
 ├── proposer
-│   ├── abi_test.go                      // ABI(애플리케이션 바이너리 인터페이스) 관련 테스트 코드
-│   ├── config.go                        // Proposer 서비스의 설정 관련 코드
-│   ├── driver.go                        // Proposer의 주요 로직을 처리하는 드라이버 코드
-│   ├── driver_test.go                   // 드라이버 로직에 대한 테스트 코드
-│   ├── l2_output_submitter.go           // L2 Output 데이터를 제출하는 로직
-│   ├── rpc
-│   │   └── api.go                       // Proposer의 RPC 인터페이스를 정의하고, 외부 서비스와의 상호작용을 처리하는 코드
-│   └── service.go                       // Proposer 서비스의 주요 비즈니스 로직을 처리하는 코드
+    ├── abi_test.go                      // ABI(애플리케이션 바이너리 인터페이스) 관련 테스트 코드
+    ├── config.go                        // Proposer 서비스의 설정 관련 코드
+    ├── driver.go                        // Proposer의 주요 로직을 처리하는 드라이버 코드
+    ├── driver_test.go                   // 드라이버 로직에 대한 테스트 코드
+    ├── l2_output_submitter.go           // L2 Output 데이터를 제출하는 로직
+    ├── rpc
+    │   └── api.go                       // Proposer의 RPC 인터페이스를 정의하고, 외부 서비스와의 상호작용을 처리하는 코드
+    └── service.go                       // Proposer 서비스의 주요 비즈니스 로직을 처리하는 코드
 ```
