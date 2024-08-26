@@ -81,25 +81,18 @@ driver.go는 배처 서비스의 주요 실행 로직을 담당하며, 트랜잭
     }
 ```
 
-## channel.go
-channel.go는 블록 데이터를 처리하고, 이를 채널에 프레임으로 전환하여 L1에 제출하기 위한 역할을 담당
-
-```plaintext
-=>  : newChannel {
-    /batcher/channel_builder.go : NewChannelBuilder {
-        /compressor/config.go  : NewCompressor
-        /op-node/rollup/derive.go : NewSpanChannelOut
-    }
-}
-```
-
 ## channel_manager.go
 channel_manager.go는 블록 데이터를 관리하고, 이를 L1에 제출하기 위한 트랜잭션 데이터를 생성하며, 채널 상태를 관리
 
 ```plaintext
 =>  : TxData {
         : ensureChannelWithSpace {
-            /batcher/channel.go : newChannel
+            /batcher/channel.go : newChannel {
+                /batcher/channel_builder.go : NewChannelBuilder {
+                    /compressor/config.go  : NewCompressor
+                    /op-node/rollup/derive.go : NewSpanChannelOut
+                }
+            }
         }
         : processBlocks {
             /batcher/channel.go : AddBlock {

@@ -55,9 +55,25 @@ service.go는 proposer 서비스의 CLIConfig를 설정하고, L2OutputSubmitter
         }
         : loop {                            // L2 Output 제출 루프
             {
-                : FetchL2OOOutput       // L2 Output Oracle과 fetch
+                : FetchL2OOOutput {       // L2 Output Oracle과 fetch
+                    : FetchCurrentBlockNumber
+                    : FetchOutput {
+                        /op-service/dial/static_rollup_provider.go : RollupClient
+                        : OutputAtBlock     // TODO
+                    }
+                }
                 or
-                : FetchDGFOutput        // Dispute Game Factory과 fetch
+                : FetchDGFOutput {        // Dispute Game Factory과 fetch
+                    : HasProposedSince
+                    : FetchCurrentBlockNumber {
+                        : RollupClient      // op-node에 연결
+                        : SyncStatus
+                    }
+                    : FetchOutput {
+                        /op-service/dial/static_rollup_provider.go : RollupClient
+                        : OutputAtBlock     // TODO
+                    }
+                }
             }
             : proposeOutput {               // 출력 제안
                 : sendTransaction {         // 트랜잭션 전송

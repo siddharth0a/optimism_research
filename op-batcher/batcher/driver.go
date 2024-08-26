@@ -209,7 +209,7 @@ func (l *BatchSubmitter) loadBlocksIntoState(ctx context.Context) error {
 	return nil
 }
 
-// op-geth로 부터 block을 state로 fetch, store
+// op-geth로 부터 block을 local state로 fetch, store
 // loadBlockIntoState fetches & stores a single block into `state`. It returns the block it loaded.
 func (l *BatchSubmitter) loadBlockIntoState(ctx context.Context, blockNumber uint64) (*types.Block, error) {
 	l2Client, err := l.EndpointProvider.EthClient(ctx)
